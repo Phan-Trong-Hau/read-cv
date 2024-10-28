@@ -7,6 +7,7 @@ import json
 import re
 import unicodedata
 import sys
+from lark import post_data_to_lark_base
 
 # Set console encoding to UTF-8
 if sys.platform.startswith('win'):
@@ -97,6 +98,8 @@ def extract_cv_info(cv_text):
         f"All values should be returned as plain strings, not as arrays or lists. "
         f"Please ensure the response is in valid JSON format. "
         f"The CV may contain Vietnamese text, please preserve Vietnamese characters. "
+        f"Pay attention to the phone number and email to avoid confusion! "
+        f"Please check the correct information fields! "
         f"Please extract: "
         f"- key: 'Full Name' "
         f"- key: 'Email' "
@@ -132,12 +135,59 @@ def extract_cv_info(cv_text):
         }
     return cv_info
 
+# def main():
+#     input_folder = "./data"
+#     output_folder = "./export"
+#     os.makedirs(output_folder, exist_ok=True)
+#     # Create a dataframe for all CVs
+#     data = []
+
+#     for filename in os.listdir(input_folder):
+#         if filename.endswith(".pdf"):
+#             try:
+#                 file_path = os.path.join(input_folder, filename)
+#                 cv_text = read_pdf(file_path)
+#                 cv_info = extract_cv_info(cv_text)
+#                 print(cv_info)
+
+#                 # Convert all values to strings and handle encoding
+#                 row_data = {
+#                     "Name": clean_text(str(cv_info.get('Full Name', 'NO DATA'))),
+#                     "Filename": str(filename),
+#                     "Email": clean_text(str(cv_info.get('Email', 'NO DATA'))),
+#                     "Phone": clean_text(str(cv_info.get('Phone Number', 'NO DATA'))),
+#                     "Job Title": clean_text(str(cv_info.get('Job Title', 'NO DATA'))),
+#                     "Date of Birth": clean_text(str(cv_info.get('Date of Birth', 'NO DATA'))),
+#                     "Gender": clean_text(str(cv_info.get('Gender', 'NO DATA'))),
+#                     "Work Experience": clean_text(str(cv_info.get('Work Experience', 'NO DATA'))),
+#                     "Education": clean_text(str(cv_info.get('Education', 'NO DATA'))),
+#                     "Note": clean_text(str(cv_info.get('Note', 'NO DATA')))
+#                 }
+
+#                 data.append(row_data)
+#                 print(f"CV information for {filename} has been processed.")
+#             except Exception as e:
+#                 print(f"Error processing file {filename}: {str(e)}")
+#                 continue
+
+#     # Save to CSV using pandas with UTF-8 encoding
+#     df = pd.DataFrame(data)
+#     csv_path = os.path.join(output_folder, "summary_cv.csv")
+#     df.to_csv(csv_path, index=False, encoding='utf-8')
+#     print(f"Summary of CVs has been saved to {csv_path}")
+
+
+
+
 def main():
     input_folder = "./data"
-    output_folder = "./export"
-    os.makedirs(output_folder, exist_ok=True)
-    # Create a dataframe for all CVs
-    data = []
+    
+    # Get Lark Base configuration from environment variables
+    base_id = os.getenv("BASE_ID_LARK")
+    table_id = os.getenv("TABLE_ID_LARK")
+    
+    if not base_id or not table_id:
+        raise Exception("BASE_ID_LARK and TABLE_ID_LARK environment variables are required")
 
     for filename in os.listdir(input_folder):
         if filename.endswith(".pdf"):
@@ -147,10 +197,9 @@ def main():
                 cv_info = extract_cv_info(cv_text)
                 print(cv_info)
 
-                # Convert all values to strings and handle encoding
-                row_data = {
+                # Prepare data for Lark Base
+                lark_data = {
                     "Name": clean_text(str(cv_info.get('Full Name', 'NO DATA'))),
-                    "Filename": str(filename),
                     "Email": clean_text(str(cv_info.get('Email', 'NO DATA'))),
                     "Phone": clean_text(str(cv_info.get('Phone Number', 'NO DATA'))),
                     "Job Title": clean_text(str(cv_info.get('Job Title', 'NO DATA'))),
@@ -161,17 +210,15 @@ def main():
                     "Note": clean_text(str(cv_info.get('Note', 'NO DATA')))
                 }
 
-                data.append(row_data)
-                print(f"CV information for {filename} has been processed.")
+                # Send data to Lark Base
+                response = post_data_to_lark_base(base_id, table_id, lark_data)
+                print(f"CV information for {filename} has been sent to Lark Base.")
             except Exception as e:
                 print(f"Error processing file {filename}: {str(e)}")
                 continue
 
-    # Save to CSV using pandas with UTF-8 encoding
-    df = pd.DataFrame(data)
-    csv_path = os.path.join(output_folder, "summary_cv.csv")
-    df.to_csv(csv_path, index=False, encoding='utf-8')
-    print(f"Summary of CVs has been saved to {csv_path}")
+    print("All CV data has been sent to Lark Base")
+
 
 if __name__ == "__main__":
     main()
