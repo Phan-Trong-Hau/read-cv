@@ -7,11 +7,65 @@ import json
 import re
 import unicodedata
 import sys
-from lark import post_data_to_lark_base
+import requests
 
 # Set console encoding to UTF-8
 if sys.platform.startswith('win'):
     sys.stdout.reconfigure(encoding='utf-8')
+
+
+def get_url_record_lark_base(base_id, table_id):
+    return f"https://open.larksuite.com/open-apis/bitable/v1/apps/{base_id}/tables/{table_id}/records"
+
+def get_access_token():
+    app_id = os.getenv("APP_ID_LARK_BASE")
+    app_secret = os.getenv("APP_SECRET_LARK_BASE")
+
+    options_get_token = {
+        "app_id": app_id,
+        "app_secret": app_secret,
+    }
+
+    response = requests.post(
+        "https://open.larksuite.com/open-apis/auth/v3/app_access_token/internal",
+        json=options_get_token,
+        headers={"Content-Type": "application/json"}
+    )
+
+    token = response.json()
+
+    if not token.get("app_access_token"):
+        raise Exception("Error getting access token from Lark Base.")
+    
+    return token["app_access_token"]
+
+def post_data_to_lark_base(base_id, table_id, data):
+    access_token = get_access_token()
+
+    options_post_data = {
+        "fields": data
+    }
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {access_token}"
+    }
+
+    response = requests.post(
+        get_url_record_lark_base(base_id, table_id),
+        json=options_post_data,
+        headers=headers
+    )
+
+    res = response.json()
+
+    if res.get("msg") != "success":
+        raise Exception(f"Error when sending data to Lark: {res}")
+
+    return res
+
+
+
 
 # Load environment variables
 load_dotenv()
@@ -134,49 +188,6 @@ def extract_cv_info(cv_text):
             "Note": "NO DATA"
         }
     return cv_info
-
-# def main():
-#     input_folder = "./data"
-#     output_folder = "./export"
-#     os.makedirs(output_folder, exist_ok=True)
-#     # Create a dataframe for all CVs
-#     data = []
-
-#     for filename in os.listdir(input_folder):
-#         if filename.endswith(".pdf"):
-#             try:
-#                 file_path = os.path.join(input_folder, filename)
-#                 cv_text = read_pdf(file_path)
-#                 cv_info = extract_cv_info(cv_text)
-#                 print(cv_info)
-
-#                 # Convert all values to strings and handle encoding
-#                 row_data = {
-#                     "Name": clean_text(str(cv_info.get('Full Name', 'NO DATA'))),
-#                     "Filename": str(filename),
-#                     "Email": clean_text(str(cv_info.get('Email', 'NO DATA'))),
-#                     "Phone": clean_text(str(cv_info.get('Phone Number', 'NO DATA'))),
-#                     "Job Title": clean_text(str(cv_info.get('Job Title', 'NO DATA'))),
-#                     "Date of Birth": clean_text(str(cv_info.get('Date of Birth', 'NO DATA'))),
-#                     "Gender": clean_text(str(cv_info.get('Gender', 'NO DATA'))),
-#                     "Work Experience": clean_text(str(cv_info.get('Work Experience', 'NO DATA'))),
-#                     "Education": clean_text(str(cv_info.get('Education', 'NO DATA'))),
-#                     "Note": clean_text(str(cv_info.get('Note', 'NO DATA')))
-#                 }
-
-#                 data.append(row_data)
-#                 print(f"CV information for {filename} has been processed.")
-#             except Exception as e:
-#                 print(f"Error processing file {filename}: {str(e)}")
-#                 continue
-
-#     # Save to CSV using pandas with UTF-8 encoding
-#     df = pd.DataFrame(data)
-#     csv_path = os.path.join(output_folder, "summary_cv.csv")
-#     df.to_csv(csv_path, index=False, encoding='utf-8')
-#     print(f"Summary of CVs has been saved to {csv_path}")
-
-
 
 
 def main():
