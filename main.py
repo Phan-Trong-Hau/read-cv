@@ -41,18 +41,53 @@ def get_access_token():
     
     return token["app_access_token"]
 
-
-def post_data_to_lark_base(base_id, table_id, data):
+def post_data_to_lark_base(base_id, table_id, data, cv_file_path):
     access_token = get_access_token()
-
-    options_post_data = {
-        "fields": data
-    }
-
+    print(access_token)
+    # Correct file upload URL for Lark Drive API
+    upload_url = "https://www.larksuite.com/approval/openapi/v2/file/upload"
+    
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {access_token}"
     }
+    
+    # Upload file to Lark Drive
+    try:
+        with open(cv_file_path, 'rb') as file:
+            files = {
+                "file": (os.path.basename(cv_file_path), file, 'application/pdf')
+            }
+            data_upload = {
+                "name": os.path.basename(cv_file_path),
+                "parent_type": "explorer",  # Specify where the file should be stored
+                "type": "attachment"
+            }
+            
+            upload_response = requests.post(upload_url, headers=headers, files=files, data=data_upload)
+            upload_response.raise_for_status()  # Check for HTTP errors
+            
+            # Parse JSON response
+            upload_result = upload_response.json()
+            if upload_result.get("code") != 0:
+                raise Exception(f"Error uploading CV file to Lark: {upload_result}")
+            
+            # Get file_token to attach to Bitable record
+            file_token = upload_result["data"]["file_token"]
+            data["CV"] = [{"file_token": file_token}]
+            
+    except requests.exceptions.HTTPError as e:
+        raise Exception(f"HTTP error during file upload: {str(e)}")
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"Request error: {str(e)}")
+    except Exception as e:
+        raise Exception(f"Unexpected error during file upload: {str(e)}")
+
+    # Post record to Lark Bitable with file reference
+    options_post_data = {
+        "fields": data
+    }
+
 
     response = requests.post(
         get_url_record_lark_base(base_id, table_id),
@@ -61,12 +96,10 @@ def post_data_to_lark_base(base_id, table_id, data):
     )
 
     res = response.json()
-
     if res.get("msg") != "success":
         raise Exception(f"Error when sending data to Lark: {res}")
 
     return res
-
 
 # Load environment variables
 load_dotenv()
@@ -264,8 +297,8 @@ def main():
                     "Note": clean_text(str(cv_info.get('Note', 'ERROR: Missing data')))
                 }
 
-                # Send data to Lark Base
-                response = post_data_to_lark_base(base_id, table_id, lark_data)
+                # Send data to Lark Base with CV file
+                response = post_data_to_lark_base(base_id, table_id, lark_data, file_path)
                 print(f"CV information for {filename} has been sent to Lark Base.")
             except Exception as e:
                 print(f"Error processing file {filename}: {str(e)}")
