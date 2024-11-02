@@ -111,20 +111,15 @@ genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 def clean_json_response(response_text):
     try:
-        # Tìm phần JSON trong chuỗi phản hồi
         json_match = re.search(r'({[\s\S]*})', response_text)
         if json_match:
             json_str = json_match.group(1)
-            # Thử chuyển đổi sang đối tượng JSON
             return json.loads(json_str)
     except json.JSONDecodeError as e:
-        # Nếu không thể phân tích cú pháp JSON, cố gắng làm sạch chuỗi
         print(f"Initial JSON parsing error: {str(e)}. Trying to clean up...")
         json_str = json_match.group(1)
-        # Thay thế các dấu ngoặc kép không khớp bằng các dấu ngoặc kép hợp lệ
         json_str = re.sub(r'"|"', '"', json_str)
         json_str = re.sub(r"'|'", "'", json_str)
-        # Thêm dấu phẩy sau các thuộc tính bị thiếu
         json_str = re.sub(r'"\s*:\s*"[^"]*"\s*(?=[^,}\s])', '",', json_str)
         try:
             return json.loads(json_str)
@@ -135,16 +130,9 @@ def clean_json_response(response_text):
 
 def clean_text(text):
     if text:
-        # Chuẩn hóa Unicode cho văn bản tiếng Việt
         text = unicodedata.normalize('NFKC', text)
-
-        # Giữ lại các ký tự tiếng Việt và các ký tự ASCII cơ bản
         text = ''.join(c for c in text if unicodedata.category(c)[0] in ['L', 'N', 'P', 'Z'] or c in [' ', '-', '_', '@', '.'])
-
-        # Loại bỏ các ký tự đặc biệt không in được
         text = re.sub(r'[\u200b\u200c\u200d\u200e\u200f]+', '', text)
-
-        # Loại bỏ khoảng trắng thừa
         text = ' '.join(text.split())
 
         return text.strip()
@@ -157,26 +145,18 @@ def read_pdf(file_path):
             pdf = PdfReader(file)
             text = ""
             for page in pdf.pages:
-                # Extract text with layout preservation
                 page_text = page.extract_text()
                 if page_text:
-                    # Add space between words that are stuck together
                     page_text = re.sub(r'([a-z])([A-Z])', r'\1 \2', page_text)
-                    # Add space between number and letter
                     page_text = re.sub(r'(\d)([A-Za-z])', r'\1 \2', page_text)
                     page_text = re.sub(r'([A-Za-z])(\d)', r'\1 \2', page_text)
-                    # Add space between lines
                     page_text = re.sub(r'([^\n])\n([^\n])', r'\1\n\n\2', page_text)
-                    # Add extra newline between sections
                     page_text = re.sub(r'([.!?])\s*(\w)', r'\1\n\n\2', page_text)
-                    # Add extra newline between bullet points
                     page_text = re.sub(r'(•|\*|\-|\d+\.)\s*', r'\n\1 ', page_text)
-                    # Add extra newline between pages to prevent text merging
                     text += page_text + "\n\n\n"
             
-            # Clean up excessive whitespace while preserving important spacing
-            text = re.sub(r'\n{5,}', '\n\n\n\n', text)  # Reduce multiple newlines but keep quadruple newlines
-            text = re.sub(r' {2,}', ' ', text)  # Reduce multiple spaces
+            text = re.sub(r'\n{5,}', '\n\n\n\n', text) 
+            text = re.sub(r' {2,}', ' ', text)  
             
             return clean_text(text)
     except Exception as e:
@@ -264,7 +244,8 @@ def extract_cv_info(cv_text, job_title):
 
 
 def main():
-    input_folder = "./data"
+    base_folder = "./data"
+    default_job_title = "Không nằm trong thư mục nào"
     
     # Get Lark Base configuration from environment variables
     base_id = os.getenv("BASE_ID_LARK")
@@ -273,16 +254,13 @@ def main():
     if not base_id or not table_id:
         raise Exception("BASE_ID_LARK and TABLE_ID_LARK environment variables are required")
 
-    # Get job title from user input once
-    # job_title = input("Please enter the job title for all CVs: ")
-    job_title = "Software Engineer"
-
-    for filename in os.listdir(input_folder):
+    # First process PDFs in root data folder
+    for filename in os.listdir(base_folder):
         if filename.endswith(".pdf"):
             try:
-                file_path = os.path.join(input_folder, filename)
+                file_path = os.path.join(base_folder, filename)
                 cv_text = read_pdf(file_path)
-                cv_info = extract_cv_info(cv_text, job_title)
+                cv_info = extract_cv_info(cv_text, default_job_title)
                 print(cv_text)
 
                 # Prepare data for Lark Base
@@ -290,7 +268,7 @@ def main():
                     "Name": clean_text(str(cv_info.get('Full Name', 'ERROR: Missing data'))),
                     "Email": clean_text(str(cv_info.get('Email', 'ERROR: Missing data'))),
                     "Phone": clean_text(str(cv_info.get('Phone Number', 'ERROR: Missing data'))),
-                    "Job Title": clean_text(str(cv_info.get('Job Title', 'ERROR: Missing data'))),
+                    "Job Title": clean_text(str(default_job_title)),
                     "Date of Birth": clean_text(str(cv_info.get('Date of Birth', 'ERROR: Missing data'))),
                     "Gender": clean_text(str(cv_info.get('Gender', 'ERROR: Missing data'))),
                     "Work Experience": clean_text(str(cv_info.get('Work Experience', 'ERROR: Missing data'))),
@@ -298,12 +276,44 @@ def main():
                     "Note": clean_text(str(cv_info.get('Note', 'ERROR: Missing data')))
                 }
 
-                # Send data to Lark Base with CV file
                 response = post_data_to_lark_base(base_id, table_id, lark_data, file_path)
                 print(f"CV information for {filename} has been sent to Lark Base.")
             except Exception as e:
                 print(f"Error processing file {filename}: {str(e)}")
                 continue
+
+    # Then process subdirectories
+    for item in os.listdir(base_folder):
+        item_path = os.path.join(base_folder, item)
+        if os.path.isdir(item_path):
+            job_title = item
+            print(f"Processing CVs for position: {job_title}")
+            
+            for filename in os.listdir(item_path):
+                if filename.endswith(".pdf"):
+                    try:
+                        file_path = os.path.join(item_path, filename)
+                        cv_text = read_pdf(file_path)
+                        cv_info = extract_cv_info(cv_text, job_title)
+                        print(cv_text)
+
+                        lark_data = {
+                            "Name": clean_text(str(cv_info.get('Full Name', 'ERROR: Missing data'))),
+                            "Email": clean_text(str(cv_info.get('Email', 'ERROR: Missing data'))),
+                            "Phone": clean_text(str(cv_info.get('Phone Number', 'ERROR: Missing data'))),
+                            "Job Title": clean_text(str(job_title)),
+                            "Date of Birth": clean_text(str(cv_info.get('Date of Birth', 'ERROR: Missing data'))),
+                            "Gender": clean_text(str(cv_info.get('Gender', 'ERROR: Missing data'))),
+                            "Work Experience": clean_text(str(cv_info.get('Work Experience', 'ERROR: Missing data'))),
+                            "Education": clean_text(str(cv_info.get('Education', 'ERROR: Missing data'))),
+                            "Note": clean_text(str(cv_info.get('Note', 'ERROR: Missing data')))
+                        }
+
+                        response = post_data_to_lark_base(base_id, table_id, lark_data, file_path)
+                        print(f"CV information for {filename} has been sent to Lark Base.")
+                    except Exception as e:
+                        print(f"Error processing file {filename}: {str(e)}")
+                        continue
 
     print("All CV data has been sent to Lark Base")
 
