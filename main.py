@@ -46,6 +46,7 @@ def get_access_token():
 def upload_file(file_path, parent_node, access_token):
     file_size = os.path.getsize(file_path)
     url = "https://open.larksuite.com/open-apis/drive/v1/files/upload_all"
+    
     form = {'file_name': os.path.basename(file_path),
             'parent_type': 'explorer',
             'parent_node': parent_node,
@@ -62,22 +63,32 @@ def upload_file(file_path, parent_node, access_token):
 def post_data_to_lark_base(base_id, table_id, data, cv_file_path):
     access_token = get_access_token()
     parent_node = os.getenv("PARENT_NODE_LARK")
-    
+    print(access_token)
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {access_token}"
     }
     
-
     # Upload file to Lark Drive
     upload_file_response = upload_file(cv_file_path, parent_node, access_token)
     print(upload_file_response)
+
+    # Get file token from upload response
+    file_token = upload_file_response.get("data", {}).get("file_token")
+    
+    if not file_token:
+        raise Exception("Failed to get file token after upload")
+    print(file_token)
+
+    data["CV"] =  {
+        "text": os.path.basename(cv_file_path),
+        "link": f"https://filumxmp.sg.larksuite.com/file/{file_token}"
+    }
 
     # Post record to Lark Bitable with file reference
     options_post_data = {
         "fields": data
     }
-
 
     response = requests.post(
         get_url_record_lark_base(base_id, table_id),
