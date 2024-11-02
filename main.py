@@ -60,10 +60,24 @@ def upload_file(file_path, parent_node, access_token):
     response = requests.request("POST", url, headers=headers, data=multi_form)
     return response.json()
 
+
+def get_records_from_lark(base_id, table_id):
+    access_token = get_access_token()
+    headers = {
+        "Authorization": f"Bearer {access_token}"
+    }
+    
+    response = requests.get(
+        get_url_record_lark_base(base_id, table_id),
+        headers=headers
+    )
+    
+    return response.json()
+
+
 def post_data_to_lark_base(base_id, table_id, data, cv_file_path):
     access_token = get_access_token()
     parent_node = os.getenv("PARENT_NODE_LARK")
-    print(access_token)
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {access_token}"
@@ -71,14 +85,12 @@ def post_data_to_lark_base(base_id, table_id, data, cv_file_path):
     
     # Upload file to Lark Drive
     upload_file_response = upload_file(cv_file_path, parent_node, access_token)
-    print(upload_file_response)
 
     # Get file token from upload response
     file_token = upload_file_response.get("data", {}).get("file_token")
     
     if not file_token:
         raise Exception("Failed to get file token after upload")
-    print(file_token)
 
     data["CV"] =  {
         "text": os.path.basename(cv_file_path),
@@ -208,7 +220,6 @@ def extract_cv_info(cv_text, job_title):
     while retry_count < max_retries:
         try:
             response = model.generate_content(prompt)
-            print(response.text)
             cv_info = clean_json_response(response.text)
             
             if not cv_info:
@@ -254,14 +265,25 @@ def main():
     if not base_id or not table_id:
         raise Exception("BASE_ID_LARK and TABLE_ID_LARK environment variables are required")
 
+    # Get existing records from Lark Base
+    existing_records = get_records_from_lark(base_id, table_id)
+    existing_files = set()
+    if existing_records.get("data", {}).get("items"):
+        for record in existing_records["data"]["items"]:
+            if "CV" in record["fields"]:
+                existing_files.add(record["fields"]["CV"]["text"])
+
     # First process PDFs in root data folder
     for filename in os.listdir(base_folder):
         if filename.endswith(".pdf"):
+            if filename in existing_files:
+                print(f"Skipping {filename} as it already exists in Lark Base")
+                continue
+                
             try:
                 file_path = os.path.join(base_folder, filename)
                 cv_text = read_pdf(file_path)
                 cv_info = extract_cv_info(cv_text, default_job_title)
-                print(cv_text)
 
                 # Prepare data for Lark Base
                 lark_data = {
@@ -291,11 +313,14 @@ def main():
             
             for filename in os.listdir(item_path):
                 if filename.endswith(".pdf"):
+                    if filename in existing_files:
+                        print(f"Skipping {filename} as it already exists in Lark Base")
+                        continue
+                        
                     try:
                         file_path = os.path.join(item_path, filename)
                         cv_text = read_pdf(file_path)
                         cv_info = extract_cv_info(cv_text, job_title)
-                        print(cv_text)
 
                         lark_data = {
                             "Name": clean_text(str(cv_info.get('Full Name', 'ERROR: Missing data'))),
