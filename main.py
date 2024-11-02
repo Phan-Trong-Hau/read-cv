@@ -8,6 +8,7 @@ import re
 import unicodedata
 import sys
 import requests
+from requests_toolbelt import MultipartEncoder
 
 
 # Set console encoding to UTF-8
@@ -41,47 +42,36 @@ def get_access_token():
     
     return token["app_access_token"]
 
+
+def upload_file(file_path, parent_node, access_token):
+    file_size = os.path.getsize(file_path)
+    url = "https://open.larksuite.com/open-apis/drive/v1/files/upload_all"
+    form = {'file_name': os.path.basename(file_path),
+            'parent_type': 'explorer',
+            'parent_node': parent_node,
+            'size': str(file_size),
+            'file': (open(file_path, 'rb'))}  
+    multi_form = MultipartEncoder(form)
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+    }
+    headers['Content-Type'] = multi_form.content_type
+    response = requests.request("POST", url, headers=headers, data=multi_form)
+    return response.json()
+
 def post_data_to_lark_base(base_id, table_id, data, cv_file_path):
     access_token = get_access_token()
-    print(access_token)
-    # Correct file upload URL for Lark Drive API
-    upload_url = "https://www.larksuite.com/approval/openapi/v2/file/upload"
+    parent_node = os.getenv("PARENT_NODE_LARK")
     
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {access_token}"
     }
     
+
     # Upload file to Lark Drive
-    try:
-        with open(cv_file_path, 'rb') as file:
-            files = {
-                "file": (os.path.basename(cv_file_path), file, 'application/pdf')
-            }
-            data_upload = {
-                "name": os.path.basename(cv_file_path),
-                "parent_type": "explorer",  # Specify where the file should be stored
-                "type": "attachment"
-            }
-            
-            upload_response = requests.post(upload_url, headers=headers, files=files, data=data_upload)
-            upload_response.raise_for_status()  # Check for HTTP errors
-            
-            # Parse JSON response
-            upload_result = upload_response.json()
-            if upload_result.get("code") != 0:
-                raise Exception(f"Error uploading CV file to Lark: {upload_result}")
-            
-            # Get file_token to attach to Bitable record
-            file_token = upload_result["data"]["file_token"]
-            data["CV"] = [{"file_token": file_token}]
-            
-    except requests.exceptions.HTTPError as e:
-        raise Exception(f"HTTP error during file upload: {str(e)}")
-    except requests.exceptions.RequestException as e:
-        raise Exception(f"Request error: {str(e)}")
-    except Exception as e:
-        raise Exception(f"Unexpected error during file upload: {str(e)}")
+    upload_file_response = upload_file(cv_file_path, parent_node, access_token)
+    print(upload_file_response)
 
     # Post record to Lark Bitable with file reference
     options_post_data = {
