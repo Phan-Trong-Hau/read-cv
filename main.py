@@ -9,7 +9,10 @@ import unicodedata
 import sys
 import requests
 from requests_toolbelt import MultipartEncoder
+from colorama import init, Fore, Style
 
+# Initialize colorama
+init()
 
 # Set console encoding to UTF-8
 if sys.platform.startswith('win'):
@@ -128,7 +131,7 @@ def clean_json_response(response_text):
             json_str = json_match.group(1)
             return json.loads(json_str)
     except json.JSONDecodeError as e:
-        print(f"Initial JSON parsing error: {str(e)}. Trying to clean up...")
+        print(f"{Fore.RED}Initial JSON parsing error: {str(e)}. Trying to clean up...{Style.RESET_ALL}")
         json_str = json_match.group(1)
         json_str = re.sub(r'"|"', '"', json_str)
         json_str = re.sub(r"'|'", "'", json_str)
@@ -136,7 +139,7 @@ def clean_json_response(response_text):
         try:
             return json.loads(json_str)
         except json.JSONDecodeError as e2:
-            print(f"Failed to clean and parse JSON: {str(e2)}")
+            print(f"{Fore.RED}Failed to clean and parse JSON: {str(e2)}{Style.RESET_ALL}")
     return None
 
 
@@ -172,7 +175,7 @@ def read_pdf(file_path):
             
             return clean_text(text)
     except Exception as e:
-        print(f"Error reading PDF file {file_path}: {str(e)}")
+        print(f"{Fore.RED}Error reading PDF file {file_path}: {str(e)}{Style.RESET_ALL}")
         return None
 
 
@@ -195,8 +198,10 @@ def extract_cv_info(cv_text, job_title):
         f"Please carefully extract the following CRITICAL information from this CV and format as JSON. "
         f"These 3 fields are the most important - please verify them multiple times:"
         f"1. Full Name - This must be the candidate's complete name"
-        f"2. Email - This must be a valid email address format that does not contain phone numbers"
-        f"3. Phone Number - This must be a valid phone number format and cannot be part of the email address"
+        f"2. Email - This must be a valid email address format. IMPORTANT: Check that the email does not contain "
+        f"any phone numbers before or within it, If an email starts with 9-12 consecutive numbers, it is a phone number, not an email (e.g., '0123456789email@domain.com' is invalid). "
+        f"The email should only contain letters, numbers, dots, and @ symbol in standard email format."
+        f"3. Phone Number - This must be a valid phone number format. Ensure this is completely separate from the email address"
         f"\nFor any field where data is not found, use 'NO DATA'. "
         f"Gender must be either 'Male' or 'Female'. "
         f"All values should be returned as plain strings, not as arrays or lists. "
@@ -222,13 +227,19 @@ def extract_cv_info(cv_text, job_title):
             response = model.generate_content(prompt)
             cv_info = clean_json_response(response.text)
             
+            if cv_info and cv_info.get('Email') != 'NO DATA':
+                email = cv_info['Email']
+                if re.search(r'\d{9,}', email):
+                    print(f"{Fore.RED}Warning: Possible phone number found in email: {email}{Style.RESET_ALL}")
+
+
             if not cv_info:
                 raise json.JSONDecodeError("No valid JSON found", "", 0)
             
             # Check if all values are "NO DATA"
             all_no_data = all(value == "NO DATA" for value in cv_info.values())
             if all_no_data:
-                print(f"Attempt {retry_count + 1}: All values are NO DATA, retrying...")
+                print(f"{Fore.YELLOW}Attempt {retry_count + 1}: All values are NO DATA, retrying...{Style.RESET_ALL}")
                 retry_count += 1
                 continue
             
@@ -237,7 +248,7 @@ def extract_cv_info(cv_text, job_title):
             return cv_info
 
         except Exception as e:
-            print(f"Error extracting CV info (attempt {retry_count + 1}): {str(e)}")
+            print(f"{Fore.RED}Error extracting CV info (attempt {retry_count + 1}): {str(e)}{Style.RESET_ALL}")
             retry_count += 1
 
     # If all retries failed, return error values
@@ -270,14 +281,14 @@ def main():
     existing_files = set()
     if existing_records.get("data", {}).get("items"):
         for record in existing_records["data"]["items"]:
-            if "CV" in record["fields"]:
+            if record.get("fields", {}).get("CV"):
                 existing_files.add(record["fields"]["CV"]["text"])
 
     # First process PDFs in root data folder
     for filename in os.listdir(base_folder):
         if filename.endswith(".pdf"):
             if filename in existing_files:
-                print(f"Skipping {filename} as it already exists in Lark Base")
+                print(f"{Fore.YELLOW}Skipping {filename} as it already exists in Lark Base{Style.RESET_ALL}")
                 continue
                 
             try:
@@ -299,9 +310,9 @@ def main():
                 }
 
                 response = post_data_to_lark_base(base_id, table_id, lark_data, file_path)
-                print(f"CV information for {filename} has been sent to Lark Base.")
+                print(f"{Fore.GREEN}CV information for {filename} has been sent to Lark Base.{Style.RESET_ALL}")
             except Exception as e:
-                print(f"Error processing file {filename}: {str(e)}")
+                print(f"{Fore.RED}Error processing file {filename}: {str(e)}{Style.RESET_ALL}")
                 continue
 
     # Then process subdirectories
@@ -314,7 +325,7 @@ def main():
             for filename in os.listdir(item_path):
                 if filename.endswith(".pdf"):
                     if filename in existing_files:
-                        print(f"Skipping {filename} as it already exists in Lark Base")
+                        print(f"{Fore.YELLOW}Skipping {filename} as it already exists in Lark Base{Style.RESET_ALL}")
                         continue
                         
                     try:
@@ -335,12 +346,12 @@ def main():
                         }
 
                         response = post_data_to_lark_base(base_id, table_id, lark_data, file_path)
-                        print(f"CV information for {filename} has been sent to Lark Base.")
+                        print(f"{Fore.GREEN}CV information for {filename} has been sent to Lark Base.{Style.RESET_ALL}")
                     except Exception as e:
-                        print(f"Error processing file {filename}: {str(e)}")
+                        print(f"{Fore.RED}Error processing file {filename}: {str(e)}{Style.RESET_ALL}")
                         continue
 
-    print("All CV data has been sent to Lark Base")
+    print(f"{Fore.GREEN}All CV data has been sent to Lark Base{Style.RESET_ALL}")
 
 
 if __name__ == "__main__":
