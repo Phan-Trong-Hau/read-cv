@@ -11,6 +11,11 @@ import requests
 from requests_toolbelt import MultipartEncoder
 from colorama import init, Fore, Style
 
+extDataDir = os.getcwd()
+if getattr(sys, 'frozen', False):
+    extDataDir = sys._MEIPASS
+load_dotenv(dotenv_path=os.path.join(extDataDir, '.env'))
+
 # Initialize colorama
 init()
 
@@ -116,9 +121,6 @@ def post_data_to_lark_base(base_id, table_id, data, cv_file_path):
         raise Exception(f"Error when sending data to Lark: {res}")
 
     return res
-
-# Load environment variables
-load_dotenv()
 
 # Configure the Gemini API
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
