@@ -266,9 +266,16 @@ def extract_cv_info(cv_text, job_title):
         "Note": "ERROR: Failed to extract data"
     }
 
-
 def main():
-    base_folder = "./data"
+    # Get the absolute path of the executable or script
+    if getattr(sys, 'frozen', False):
+        # If running as compiled executable
+        base_path = os.path.dirname(sys.executable)
+    else:
+        # If running as script
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    
+    base_folder = os.path.join(base_path, "data")
     default_job_title = "Không nằm trong thư mục nào"
     
     # Get Lark Base configuration from environment variables
