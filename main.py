@@ -11,11 +11,11 @@ import requests
 from requests_toolbelt import MultipartEncoder
 from colorama import init, Fore, Style
 
-extDataDir = os.getcwd()
-if getattr(sys, 'frozen', False):
-    extDataDir = sys._MEIPASS
-load_dotenv(dotenv_path=os.path.join(extDataDir, '.env'))
+exe_file = sys.executable
+exe_parent = os.path.dirname(exe_file)
+dotenv_path = os.path.join(exe_parent, ".env")
 
+load_dotenv(dotenv_path=dotenv_path)
 # Initialize colorama
 init()
 
