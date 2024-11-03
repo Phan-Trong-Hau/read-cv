@@ -100,7 +100,7 @@ def post_data_to_lark_base(base_id, table_id, data, cv_file_path):
     if not file_token:
         raise Exception("Failed to get file token after upload")
 
-    data["CV"] =  {
+    data["File CV"] =  {
         "text": os.path.basename(cv_file_path),
         "link": f"https://filumxmp.sg.larksuite.com/file/{file_token}"
     }
@@ -290,8 +290,8 @@ def main():
     existing_files = set()
     if existing_records.get("data", {}).get("items"):
         for record in existing_records["data"]["items"]:
-            if record.get("fields", {}).get("CV"):
-                existing_files.add(record["fields"]["CV"]["text"])
+            if record.get("fields", {}).get("File CV"):
+                existing_files.add(record["fields"]["File CV"]["text"])
 
     # First process PDFs in root data folder
     for filename in os.listdir(base_folder):
@@ -308,12 +308,12 @@ def main():
                 # Prepare data for Lark Base
                 lark_data = {
                     "Name": clean_text(str(cv_info.get('Full Name', 'ERROR: Missing data'))),
-                    "Email": clean_text(str(cv_info.get('Email', 'ERROR: Missing data'))),
+                    "Email": {"text": clean_text(str(cv_info.get('Email', 'ERROR: Missing data'))), "link": f"mailto:{clean_text(str(cv_info.get('Email', 'ERROR: Missing data')))}"},
                     "Phone": clean_text(str(cv_info.get('Phone Number', 'ERROR: Missing data'))),
-                    "Job Title": clean_text(str(default_job_title)),
-                    "Date of Birth": clean_text(str(cv_info.get('Date of Birth', 'ERROR: Missing data'))),
-                    "Gender": clean_text(str(cv_info.get('Gender', 'ERROR: Missing data'))),
-                    "Work Experience": clean_text(str(cv_info.get('Work Experience', 'ERROR: Missing data'))),
+                    "Position Applied": clean_text(str(default_job_title)),
+                    "Ngày sinh": clean_text(str(cv_info.get('Date of Birth', 'ERROR: Missing data'))),
+                    "Giới tính": clean_text(str(cv_info.get('Gender', 'ERROR: Missing data'))),
+                    "Working Experience": clean_text(str(cv_info.get('Work Experience', 'ERROR: Missing data'))),
                     "Education": clean_text(str(cv_info.get('Education', 'ERROR: Missing data'))),
                     "Note": clean_text(str(cv_info.get('Note', 'ERROR: Missing data')))
                 }
@@ -344,12 +344,12 @@ def main():
 
                         lark_data = {
                             "Name": clean_text(str(cv_info.get('Full Name', 'ERROR: Missing data'))),
-                            "Email": clean_text(str(cv_info.get('Email', 'ERROR: Missing data'))),
+                            "Email": {"text": clean_text(str(cv_info.get('Email', 'ERROR: Missing data'))), "link": f"mailto:{clean_text(str(cv_info.get('Email', 'ERROR: Missing data')))}"},
                             "Phone": clean_text(str(cv_info.get('Phone Number', 'ERROR: Missing data'))),
-                            "Job Title": clean_text(str(job_title)),
-                            "Date of Birth": clean_text(str(cv_info.get('Date of Birth', 'ERROR: Missing data'))),
-                            "Gender": clean_text(str(cv_info.get('Gender', 'ERROR: Missing data'))),
-                            "Work Experience": clean_text(str(cv_info.get('Work Experience', 'ERROR: Missing data'))),
+                            "Position Applied": clean_text(str(job_title)),
+                            "Ngày sinh": clean_text(str(cv_info.get('Date of Birth', 'ERROR: Missing data'))),
+                            "Giới tính": clean_text(str(cv_info.get('Gender', 'ERROR: Missing data'))),
+                            "Working Experience": clean_text(str(cv_info.get('Work Experience', 'ERROR: Missing data'))),
                             "Education": clean_text(str(cv_info.get('Education', 'ERROR: Missing data'))),
                             "Note": clean_text(str(cv_info.get('Note', 'ERROR: Missing data')))
                         }
