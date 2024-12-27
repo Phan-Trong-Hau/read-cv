@@ -42,7 +42,7 @@ sitemap.xml
 /data
 /export
 .venv
-/__pycache__
+*/__pycache__
 *.exe
 *.spec
 /dist

@@ -1,0 +1,4 @@
+colorama
+python-dotenv
+lark
+PyPDF2
