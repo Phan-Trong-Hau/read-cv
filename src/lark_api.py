@@ -1,7 +1,13 @@
 import os
+import sys
 import requests
 from requests_toolbelt import MultipartEncoder
 from dotenv import load_dotenv
+
+
+exe_file = sys.executable
+exe_parent = os.path.dirname(exe_file)
+dotenv_path = os.path.join(exe_parent, ".env")
 
 load_dotenv()
 

@@ -1,12 +1,18 @@
 import os
 import re
+import sys
 import json
 import google.generativeai as genai
 from colorama import Fore, Style
 from utils import clean_json_response
 from dotenv import load_dotenv
 
-load_dotenv()
+
+exe_file = sys.executable
+exe_parent = os.path.dirname(exe_file)
+dotenv_path = os.path.join(exe_parent, ".env")
+
+load_dotenv(dotenv_path=dotenv_path)
 
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
