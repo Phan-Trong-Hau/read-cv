@@ -30,7 +30,7 @@ def extract_cv_info(cv_text, job_title):
             "Note": "ERROR: No CV text provided"
         }
 
-    model = genai.GenerativeModel('gemini-pro')
+    model = genai.GenerativeModel('gemini-1.5-flash')
     prompt = (
         f"Please carefully extract the following CRITICAL information from this CV and format as JSON. "
         f"These 3 fields are the most important - please verify them multiple times:"
